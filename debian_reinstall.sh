@@ -2,9 +2,9 @@ cat > /root/debian_reinstall.sh << 'EOF'
 #!/bin/bash
 set -e
 
-# === 先下载重装脚本（按你的要求放最上面） ===
+# === 先下载重装脚本（放最上面，并保留你原来的 $_ 写法） ===
 curl -O https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh \
-  || wget -O reinstall.sh https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh
+  || wget -O reinstall.sh $_
 chmod +x reinstall.sh
 
 # === 输入主机名 ===
@@ -47,7 +47,11 @@ if [ -z "$swap_input" ]; then
 fi
 
 # === 调用重装（debian13 放最前） ===
-bash ./reinstall.sh debian13 --password "$password_input" --hostname "$hostname_input" --ssh-port "$ssh_port" --swap "$swap_input"
+bash ./reinstall.sh debian13 \
+  --password "$password_input" \
+  --hostname "$hostname_input" \
+  --ssh-port "$ssh_port" \
+  --swap "$swap_input"
 
 # === 完成提示 ===
 echo "安装已完成，系统将在 5 秒后重启..."
