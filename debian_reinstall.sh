@@ -1,108 +1,66 @@
 cat > /root/debian_reinstall.sh << 'EOF'
-#!/usr/bin/env bash
+#!/bin/bash
 set -euo pipefail
 
-# ========= 下载 InstallNET.sh（多源 + 重试 + IPv4）=========
-URL_MAIN="https://raw.githubusercontent.com/leitbogioro/Tools/master/Linux_reinstall/InstallNET.sh"
-URL_CDN1="https://cdn.jsdelivr.net/gh/leitbogioro/Tools@master/Linux_reinstall/InstallNET.sh"
-URL_CDN2="https://github.moeyy.xyz/https://raw.githubusercontent.com/leitbogioro/Tools/master/Linux_reinstall/InstallNET.sh"
+# === 先下载 bin456789 的脚本 ===
+curl -4 -fL -O https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh \
+  || wget -4 -O reinstall.sh https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh
+chmod +x reinstall.sh
 
-download_installnet() {
-  local url="$1"
-  echo "⬇️  尝试下载: $url"
-  for i in 1 2 3; do
-    if command -v curl >/dev/null 2>&1; then
-      curl -4 -fL "$url" -o InstallNET.sh && return 0
-    fi
-    if command -v wget >/dev/null 2>&1; then
-      wget -4 -O InstallNET.sh "$url" && return 0
-    fi
-    echo "重试 $i/3 …"
-    sleep 1
-  done
-  return 1
-}
-
-rm -f InstallNET.sh
-download_installnet "$URL_MAIN" || download_installnet "$URL_CDN1" || download_installnet "$URL_CDN2" || {
-  echo "❌ 无法下载 InstallNET.sh（主源与备用源都失败）"; exit 1;
-}
-chmod +x InstallNET.sh
-head -n 3 InstallNET.sh || true
-
-# ================= 交互输入 =================
-# 主机名（允许默认）
-read -rp "请输入主机名（留空默认 debian-server）: " hostname_input
+# === 输入主机名（安装后再设置） ===
+read -p "请输入主机名: " hostname_input
 hostname_input="${hostname_input:-debian-server}"
 
-# 密码（必填 + 二次确认）
+# === 必须输入密码 ===
 while true; do
-  read -srp "请输入 root 密码（必填）: " password_input; echo
-  [[ -z "$password_input" ]] && { echo "❌ 密码不能为空"; continue; }
-  read -srp "请再次输入以确认: " password_confirm; echo
-  if [[ "$password_input" != "$password_confirm" ]]; then
-    echo "❌ 两次密码不一致，请重试"
-  else
-    break
-  fi
+  read -s -p "请输入 root 密码 (必填): " password_input; echo
+  [[ -z "$password_input" ]] && { echo "❌ 密码不能为空，请重新输入！"; continue; }
+  break
 done
 
-# 端口（必填 + 数字 + 范围）
+# === 必须输入 SSH 端口 ===
 while true; do
-  read -rp "请输入 SSH 端口（必填，1-65535）: " ssh_port
+  read -p "请输入 SSH 端口 (必填): " ssh_port
   if [[ -z "$ssh_port" ]]; then
-    echo "❌ 端口不能为空"
+    echo "❌ 端口不能为空，请重新输入！"
   elif ! [[ "$ssh_port" =~ ^[0-9]+$ ]]; then
-    echo "❌ 端口必须是数字"
+    echo "❌ 端口必须是数字，请重新输入！"
   elif (( ssh_port < 1 || ssh_port > 65535 )); then
-    echo "❌ 端口范围必须在 1-65535"
+    echo "❌ 端口范围必须在 1-65535，请重新输入！"
   else
     break
   fi
 done
 
-# Swap（可留空，默认为 1024）
-while true; do
-  read -rp "请输入 Swap 大小（MB，留空默认 1024）: " swap_input
-  swap_input="${swap_input:-1024}"
-  if ! [[ "$swap_input" =~ ^[0-9]+$ ]]; then
-    echo "❌ Swap 必须是数字"
-  else
-    break
-  fi
-done
+# === 输入 Swap 大小（安装后再设置） ===
+read -p "请输入 Swap 大小 (MB): " swap_input
+swap_input="${swap_input:-1024}"
+if ! [[ "$swap_input" =~ ^[0-9]+$ ]]; then
+  echo "❌ Swap 必须是数字"; exit 1
+fi
 
-# ================= 执行前总览 =================
-cat <<CONFIRM
+echo "🚀 开始重装：reinstall.sh debian13（仅传支持的参数）"
+bash ./reinstall.sh debian13 \
+  --password "$password_input" \
+  --ssh-port "$ssh_port"
 
-即将执行重装：
-  系统    : Debian 13 (bookworm)
-  主机名  : $hostname_input
-  SSH端口 : $ssh_port
-  Swap    : ${swap_input}MB
-  时区    : Asia/Shanghai
-  BBR     : 开启
+# 系统将重启；以下为重启后应执行的收尾命令（供参考）
+cat >/root/_post_install_notes.txt <<POST
+# 登录后执行以设置主机名与 Swap：
+hostnamectl set-hostname "$hostname_input"
+echo "127.0.1.1 $hostname_input" >> /etc/hosts
 
-⚠️ 注意：该操作将清空系统并重装，SSH 将中断。
-CONFIRM
-read -rp "确认执行？输入 YES 继续: " go
-[[ "$go" == "YES" ]] || { echo "已取消"; exit 0; }
+swapoff -a || true
+fallocate -l ${swap_input}M /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=${swap_input}
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+POST
 
-# ================= 调用 InstallNET.sh =================
-echo "🚀 执行：InstallNET.sh"
-bash InstallNET.sh \
-  -debian 13 \
-  -port "$ssh_port" \
-  -pwd "$password_input" \
-  -hostname "$hostname_input" \
-  -timezone "Asia/Shanghai" \
-  -swap "$swap_input" \
-  --bbr
-
-echo "✅ 安装脚本执行完成，5 秒后重启..."
+echo "✅ 安装脚本执行完成。将于 5 秒后重启..."
 sleep 5
 reboot
 EOF
 
-# 给权限并立即执行
 chmod +x /root/debian_reinstall.sh && bash /root/debian_reinstall.sh
