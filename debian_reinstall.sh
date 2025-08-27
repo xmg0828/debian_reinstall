@@ -5,22 +5,25 @@ cat > /root/debian_reinstall.sh << 'EOF'
 wget --no-check-certificate -qO InstallNET.sh 'https://raw.githubusercontent.com/leitbogioro/Tools/master/Linux_reinstall/InstallNET.sh'
 chmod a+x InstallNET.sh
 
-# === 提示用户输入主机名 ===
+# === 输入主机名 ===
 read -p "请输入主机名: " hostname_input
 if [ -z "$hostname_input" ]; then
   hostname_input="debian-server"
   echo "未输入主机名，使用默认值: $hostname_input"
 fi
 
-# === 提示用户输入密码 ===
-read -s -p "请输入root密码: " password_input
-echo
-if [ -z "$password_input" ]; then
-  password_input="G8$hT@mZ7@xPq^29Lw"
-  echo "未输入密码，使用默认值"
-fi
+# === 必须输入密码 ===
+while true; do
+  read -s -p "请输入root密码(必填): " password_input
+  echo
+  if [ -z "$password_input" ]; then
+    echo "❌ 密码不能为空，请重新输入！"
+  else
+    break
+  fi
+done
 
-# === 提示用户输入Swap大小 ===
+# === 输入Swap大小 ===
 read -p "请输入Swap大小(MB): " swap_input
 if [ -z "$swap_input" ]; then
   swap_input="1024"
