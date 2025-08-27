@@ -16,7 +16,7 @@ fi
 read -s -p "请输入root密码: " password_input
 echo
 if [ -z "$password_input" ]; then
-  password_input="fJ7#vP9s@tL2qX!d"
+  password_input="G8$hT@mZ7@xPq^29Lw"
   echo "未输入密码，使用默认值"
 fi
 
