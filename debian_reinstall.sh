@@ -1,10 +1,6 @@
 cat > /root/debian_reinstall.sh << 'EOF'
 #!/bin/bash
 
-# === 下载原始脚本 ===
-wget --no-check-certificate -qO InstallNET.sh 'https://raw.githubusercontent.com/leitbogioro/Tools/master/Linux_reinstall/InstallNET.sh'
-chmod a+x InstallNET.sh
-
 # === 输入主机名 ===
 read -p "请输入主机名: " hostname_input
 if [ -z "$hostname_input" ]; then
@@ -44,10 +40,15 @@ if [ -z "$swap_input" ]; then
   echo "未输入 Swap 大小，使用默认值: ${swap_input}MB"
 fi
 
-# === 执行安装脚本 ===
-bash InstallNET.sh -debian 13 -port "$ssh_port" -pwd "$password_input" -hostname "$hostname_input" -timezone "Asia/Shanghai" -swap "$swap_input" --bbr
+# === 下载并执行 bin456789 的重装脚本 ===
+curl -O https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh || wget -O reinstall.sh https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh
 
-# === 安装完成后自动重启 ===
+chmod +x reinstall.sh
+
+# 传入 Debian 13 及参数
+bash reinstall.sh debian13 --password "$password_input" --hostname "$hostname_input" --ssh-port "$ssh_port" --swap "$swap_input"
+
+# === 完成提示 ===
 echo "安装已完成，系统将在 5 秒后重启..."
 sleep 5
 reboot
